@@ -2,14 +2,17 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import 'dotenv/config';
 import { db } from './db/index.js';
-import { users } from './db/schema.js';
+import { users, todos } from './db/schema.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { setCookie } from 'hono/cookie';
+import { setCookie, getCookie } from 'hono/cookie';
+import { serveStatic } from '@hono/node-server/serve-static';
 
 const app = new Hono();
 
-app.get('/', (c) => c.html('<h1>Tim Pengembang</h1><h2>Nama Kalian</h2>'));
+app.use('/*', serveStatic({ root: './public' }));
+// app.use('/', serveStatic({ path: './public/index.html' }));
+// app.get('/', (c) => c.html('<h1>Tim Pengembang</h1><h2>Nama Kalian</h2>'));
 
 app.post('/api/register', async (c) => {
   try {
@@ -58,6 +61,54 @@ app.post('/api/login', async (c) => {
   });
 
   return c.json({ success: true, message: 'Login berhasil' });
+});
+
+app.get('/api/me', (c) => {
+  const token = getCookie(c, 'token');
+  if (!token) return c.json({ success: false, message: 'Unauthorized' }, 401);
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET);
+
+    return c.json({ success: true, data: user });
+  } catch (error) {
+    return c.json({ success: false, message: 'Unauthorized' }, 401);
+  }
+});
+
+app.post('/api/logout', (c) => {
+  setCookie(c, 'token', '', { maxAge: -1 });
+  return c.json({ success: true, message: 'Logout berhasil' });
+});
+
+app.post('/api/todos', async (c) => {
+  const token = getCookie(c, 'token');
+  if (!token) return c.json({ success: false, message: 'Unauthorized' }, 401);
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET);
+    const { note } = await c.req.json();
+    const newTodo = await db
+      .insert(todos)
+      .values({ note, userId: user.id })
+      .returning();
+    return c.json({ success: true, data: newTodo[0] }, 201);
+    return c.json({ success: true, data: user });
+  } catch (error) {
+    return c.json({ success: false, message: 'Unauthorized' }, 401);
+  }
+});
+
+app.get('/api/todos', async (c) => {
+  const token = getCookie(c, 'token');
+  if (!token) return c.json({ success: false, message: 'Unauthorized' }, 401);
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET);
+    const userTodos = await db.query.todos.findMany({
+      where: (todos, { eq }) => eq(todos.userId, user.id),
+    });
+    return c.json({ success: true, data: userTodos });
+  } catch (error) {
+    return c.json({ success: false, message: 'Unauthorized' }, 401);
+  }
 });
 
 serve({ fetch: app.fetch, port: 3000 });

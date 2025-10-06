@@ -9,7 +9,9 @@
     📄 0000_snapshot.json
     📄 _journal.json
 📄 drizzle.config.js
+📄 index.js
 📄 package.json
+📁 public/
 
 === File Contents ===
 
@@ -22,8 +24,125 @@ export default {
   out: './drizzle',
   dbCredentials: {
     url: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
   },
 };
+
+
+=== File: index.js ===
+import { Hono } from 'hono';
+import { serve } from '@hono/node-server';
+import 'dotenv/config';
+import { db } from './db/index.js';
+import { users, todos } from './db/schema.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { setCookie, getCookie } from 'hono/cookie';
+
+const app = new Hono();
+
+app.get('/', (c) => c.html('<h1>Tim Pengembang</h1><h2>Nama Kalian</h2>'));
+
+app.post('/api/register', async (c) => {
+  try {
+    const { username, password } = await c.req.json();
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await db
+      .insert(users)
+      .values({ username, password: hashedPassword })
+      .returning({ id: users.id, username: users.username });
+
+    return c.json({ success: true, data: newUser[0] }, 201);
+  } catch (error) {
+    return c.json({ success: false, message: 'Registrasi gagal' }, 400);
+  }
+});
+
+app.post('/api/login', async (c) => {
+  const { username, password } = await c.req.json();
+  const user = await db.query.users.findFirst({
+    where: (users, { eq }) => eq(users.username, username),
+  });
+
+  if (!user)
+    return c.json(
+      { success: false, message: 'Username atau password salah' },
+      401
+    );
+
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid)
+    return c.json(
+      { success: false, message: 'Username atau password salah' },
+      401
+    );
+
+  const token = jwt.sign(
+    { id: user.id, username: user.username },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  );
+
+  setCookie(c, 'token', token, {
+    httpOnly: true,
+    sameSite: 'Lax',
+    maxAge: 3600,
+  });
+
+  return c.json({ success: true, message: 'Login berhasil' });
+});
+
+app.get('/api/me', (c) => {
+  const token = getCookie(c, 'token');
+  if (!token) return c.json({ success: false, message: 'Unauthorized' }, 401);
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET);
+
+    return c.json({ success: true, data: user });
+  } catch (error) {
+    return c.json({ success: false, message: 'Unauthorized' }, 401);
+  }
+});
+
+app.post('/api/logout', (c) => {
+  setCookie(c, 'token', '', { maxAge: -1 });
+  return c.json({ success: true, message: 'Logout berhasil' });
+});
+
+app.post('/api/todos', async (c) => {
+  const token = getCookie(c, 'token');
+  if (!token) return c.json({ success: false, message: 'Unauthorized' }, 401);
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET);
+    const { note } = await c.req.json();
+    const newTodo = await db
+      .insert(todos)
+      .values({ note, userId: user.id })
+      .returning();
+    return c.json({ success: true, data: newTodo[0] }, 201);
+    return c.json({ success: true, data: user });
+  } catch (error) {
+    return c.json({ success: false, message: 'Unauthorized' }, 401);
+  }
+});
+
+app.get('api/todos', async (c) => {
+  const token = getCookie(c, 'token');
+  if (!token) return c.json({ success: false, message: 'Unauthorized' }, 401);
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET);
+    const userTodos = await db.query.todos.findMany({
+      where: (todos, { eq }) => eq(todos.userId, user.id),
+    });
+    return c.json({ success: true, data: userTodos });
+  } catch (error) {
+    return c.json({ success: false, message: 'Unauthorized' }, 401);
+  }
+});
+
+serve({ fetch: app.fetch, port: 3000 });
+console.log('✅ API running at http://localhost:3000');
+
 
 === File: package.json ===
 {
@@ -35,25 +154,27 @@ export default {
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node db/seed.js",
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@hono/node-server": "^1.19.5",
+    "bcryptjs": "^3.0.2",
+    "cookie": "^1.0.2",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.6",
+    "hono": "^4.9.10",
+    "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.3"
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.5"
   }
 }
-
-
-
-=== File: drizzle/0000_sparkling_roulette.sql ===
-[Binary or unreadable file]
 
 
 === File: db/index.js ===
@@ -63,6 +184,7 @@ import * as schema from './schema.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
 });
 
 export const db = drizzle(pool, { schema });
@@ -87,21 +209,47 @@ export const todos = pgTable('todos', {
 
 
 === File: db/seed.js ===
+// seed.js
 import 'dotenv/config';
 import { db } from './index.js';
-import { santri } from './schema.js';
+import { todos, users } from './schema.js';
 
-async function main() {
-  await db.insert(santri).values([
-    { id: 1, nama: 'Ahmad Fauzi', kelas: 10 },
-    { id: 2, nama: 'Muhammad Rizky', kelas: 12 },
-    { id: 3, nama: 'Alwi Saputra', kelas: 11 },
+async function seed() {
+  console.log('Seeding database...');
+
+  // Hapus data lama (opsional)
+  await db.delete(todos);
+  await db.delete(users);
+
+  // Buat user dummy
+  const user1 = await db
+    .insert(users)
+    .values({
+      username: 'andi',
+      // Di aplikasi nyata, password ini harus di-hash!
+      // Tapi untuk seed, kita bisa gunakan teks biasa.
+      password: 'hashed_password_for_andi',
+    })
+    .returning();
+
+  // Buat todo dummy untuk user1
+  await db.insert(todos).values([
+    { note: 'Belajar Drizzle ORM', userId: user1[0].id },
+    { note: 'Membuat API dengan Hono', userId: user1[0].id },
   ]);
 
-  console.log(' Data santri berhasil di-seed');
+  console.log('✅ Seeding completed!');
+  process.exit(0);
 }
 
-main();
+seed().catch((err) => {
+  console.error('❌ Seeding failed:', err);
+  process.exit(1);
+});
+
+
+=== File: drizzle/0000_sparkling_roulette.sql ===
+[Binary or unreadable file]
 
 
 === File: drizzle/meta/0000_snapshot.json ===
