@@ -11,7 +11,7 @@
   <div>
     <header>
       <h1>Halo, <span id="username"></span>!</h1>
-      <button id="logoutBtn">Logout</button>
+      <a href="/logout/">Logout</a>
     </header>
 
     <main>
@@ -26,7 +26,6 @@
 
   <script>
     const usernameSpan = document.getElementById('username');
-    const logoutBtn = document.getElementById('logoutBtn');
     const addTodoForm = document.getElementById('addTodoForm');
     const noteInput = document.getElementById('noteInput');
     const todoList = document.getElementById('todoList');
@@ -54,7 +53,7 @@
     // 2. Fungsi untuk mengambil dan menampilkan todos
     const fetchTodos = async () => {
       try {
-        const response = await fetch('api/todos'); // Endpoint GET
+        const response = await fetch('/api/todos'); // Endpoint GET
         const { success, data } = await response.json();
         if (success) {
           todoList.innerHTML = ''; // Kosongkan daftar
@@ -91,15 +90,7 @@
       }
     });
 
-    // 4. Event listener untuk tombol logout
-    logoutBtn.addEventListener('click', async () => {
-      try {
-        await fetch('/api/logout', { method: 'POST' });
-        window.location.href = '/login/';
-      } catch (error) {
-        console.error('Logout gagal:', error);
-      }
-    });
+
   </script>
 </body>
 
