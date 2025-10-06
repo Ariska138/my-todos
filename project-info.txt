@@ -12,6 +12,15 @@
 📄 index.js
 📄 package.json
 📁 public/
+  📄 index.html
+  📁 login/
+    📄 index.html
+  📁 logout/
+    📄 index.html
+  📁 register/
+    📄 index.html
+  📁 todos/
+    📄 index.html
 
 === File Contents ===
 
@@ -38,10 +47,13 @@ import { users, todos } from './db/schema.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { setCookie, getCookie } from 'hono/cookie';
+import { serveStatic } from '@hono/node-server/serve-static';
 
 const app = new Hono();
 
-app.get('/', (c) => c.html('<h1>Tim Pengembang</h1><h2>Nama Kalian</h2>'));
+app.use('/*', serveStatic({ root: './public' }));
+// app.use('/', serveStatic({ path: './public/index.html' }));
+// app.get('/', (c) => c.html('<h1>Tim Pengembang</h1><h2>Nama Kalian</h2>'));
 
 app.post('/api/register', async (c) => {
   try {
@@ -126,7 +138,7 @@ app.post('/api/todos', async (c) => {
   }
 });
 
-app.get('api/todos', async (c) => {
+app.get('/api/todos', async (c) => {
   const token = getCookie(c, 'token');
   if (!token) return c.json({ success: false, message: 'Unauthorized' }, 401);
   try {
@@ -175,6 +187,10 @@ console.log('✅ API running at http://localhost:3000');
     "drizzle-kit": "^0.31.5"
   }
 }
+
+
+=== File: drizzle/0000_sparkling_roulette.sql ===
+[Binary or unreadable file]
 
 
 === File: db/index.js ===
@@ -248,9 +264,42 @@ seed().catch((err) => {
 });
 
 
-=== File: drizzle/0000_sparkling_roulette.sql ===
-[Binary or unreadable file]
+=== File: public/index.html ===
+<!DOCTYPE html>
+<html lang="en">
 
+<head>
+  <meta charset="UTF--8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loading...</title>
+</head>
+
+<body>
+  <h1>Memeriksa status login...</h1>
+
+  <script>
+    (async () => {
+      try {
+        const response = await fetch('/api/me');
+        if (response.ok) {
+          const { success } = await response.json();
+          if (success) {
+            window.location.href = '/todos/';
+          } else {
+            window.location.href = '/login/';
+          }
+        } else {
+          window.location.href = '/login/';
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        window.location.href = '/login/';
+      }
+    })();
+  </script>
+</body>
+
+</html>
 
 === File: drizzle/meta/0000_snapshot.json ===
 {
@@ -371,3 +420,243 @@ seed().catch((err) => {
     }
   ]
 }
+
+=== File: public/login/index.html ===
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login</title>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Login</h1>
+    <div id="message"></div>
+    <form id="loginForm">
+      <input type="text" id="username" placeholder="Username" required />
+      <input type="password" id="password" placeholder="Password" required />
+      <button type="submit">Login</button>
+    </form>
+    <p>Belum punya akun? <a href="/register/">Daftar di sini</a></p>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const messageDiv = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      messageDiv.textContent = '';
+
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          window.location.href = '/todos/';
+        } else {
+          messageDiv.textContent = result.message || 'Login gagal!';
+        }
+      } catch (error) {
+        messageDiv.textContent = 'Terjadi kesalahan. Silakan coba lagi.';
+      }
+    });
+  </script>
+</body>
+
+</html>
+
+=== File: public/logout/index.html ===
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Logging Out...</title>
+</head>
+
+<body>
+  <h1>Anda sedang keluar...</h1>
+  <script>
+    (async () => {
+      try {
+        await fetch('/api/logout', { method: 'POST' });
+      } catch (error) {
+        console.error('Logout failed:', error);
+      } finally {
+        window.location.href = '/login/';
+      }
+    })();
+  </script>
+</body>
+
+</html>
+
+=== File: public/register/index.html ===
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registrasi</title>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Registrasi Akun Baru</h1>
+    <div id="message"></div>
+    <form id="registrationForm">
+      <input type="text" id="username" placeholder="Username" required />
+      <input type="password" id="password" placeholder="Password" required />
+      <button type="submit">Daftar</button>
+    </form>
+    <p>Sudah punya akun? <a href="/login/">Login di sini</a></p>
+  </div>
+
+  <script>
+    const form = document.getElementById('registrationForm');
+    const messageDiv = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      messageDiv.textContent = '';
+      messageDiv.style.color = 'red';
+
+      try {
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          messageDiv.style.color = 'green';
+          messageDiv.innerHTML =
+            'Registrasi berhasil! Silakan <a href="/login/">login</a>.';
+          form.reset();
+        } else {
+          messageDiv.textContent = result.message || 'Registrasi gagal!';
+        }
+      } catch (error) {
+        messageDiv.textContent = 'Terjadi kesalahan. Silakan coba lagi.';
+      }
+    });
+  </script>
+</body>
+
+</html>
+
+=== File: public/todos/index.html ===
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Todos</title>
+</head>
+
+<body>
+  <div>
+    <header>
+      <h1>Halo, <span id="username"></span>!</h1>
+      <a href="/logout/">Logout</a>
+    </header>
+
+    <main>
+      <h2>Todos Anda</h2>
+      <form id="addTodoForm">
+        <input type="text" id="noteInput" placeholder="Apa yang perlu dilakukan?" required />
+        <button type="submit">Tambah</button>
+      </form>
+      <ul id="todoList"></ul>
+    </main>
+  </div>
+
+  <script>
+    const usernameSpan = document.getElementById('username');
+    const addTodoForm = document.getElementById('addTodoForm');
+    const noteInput = document.getElementById('noteInput');
+    const todoList = document.getElementById('todoList');
+
+    // 1. Periksa status login & dapatkan data pengguna
+    (async () => {
+      try {
+        const response = await fetch('/api/me');
+        if (!response.ok) {
+          window.location.href = '/login/';
+          return;
+        }
+        const { success, data } = await response.json();
+        if (success) {
+          usernameSpan.textContent = data.username;
+          fetchTodos(); // Muat todos setelah user terverifikasi
+        } else {
+          window.location.href = '/login/';
+        }
+      } catch (error) {
+        window.location.href = '/login/';
+      }
+    })();
+
+    // 2. Fungsi untuk mengambil dan menampilkan todos
+    const fetchTodos = async () => {
+      try {
+        const response = await fetch('/api/todos'); // Endpoint GET
+        const { success, data } = await response.json();
+        if (success) {
+          todoList.innerHTML = ''; // Kosongkan daftar
+          data.forEach((todo) => {
+            const li = document.createElement('li');
+            li.textContent = todo.note;
+            todoList.appendChild(li);
+          });
+        }
+      } catch (error) {
+        console.error('Gagal mengambil todos:', error);
+      }
+    };
+
+    // 3. Event listener untuk menambah todo baru
+    addTodoForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const note = noteInput.value;
+      if (!note) return;
+
+      try {
+        const response = await fetch('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note }),
+        });
+        const { success } = await response.json();
+        if (success) {
+          noteInput.value = '';
+          fetchTodos(); // Muat ulang daftar todos
+        }
+      } catch (error) {
+        console.error('Gagal menambah todo:', error);
+      }
+    });
+
+
+  </script>
+</body>
+
+</html>

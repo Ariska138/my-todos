@@ -111,5 +111,18 @@ app.get('/api/todos', async (c) => {
   }
 });
 
-serve({ fetch: app.fetch, port: 3000 });
-console.log('✅ API running at http://localhost:3000');
+if (process.env.VERCEL) {
+  // Jika berjalan di Vercel, ekspor aplikasi Hono
+  // Vercel akan menangani servernya
+  console.log('Running on Vercel');
+  globalThis.app = app; // Pastikan app dapat diakses secara global oleh Vercel
+} else {
+  // Jika berjalan di lokal, jalankan server development
+  const port = 3000;
+  console.log(`✅ Server is running on http://localhost:${port}`);
+  serve({
+    fetch: app.fetch,
+    port,
+  });
+}
+export default app;
