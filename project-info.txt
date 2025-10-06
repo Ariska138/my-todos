@@ -1,0 +1,225 @@
+=== Project Structure ===
+📁 db/
+  📄 index.js
+  📄 schema.js
+  📄 seed.js
+📁 drizzle/
+  📄 0000_sparkling_roulette.sql
+  📁 meta/
+    📄 0000_snapshot.json
+    📄 _journal.json
+📄 drizzle.config.js
+📄 package.json
+
+=== File Contents ===
+
+=== File: drizzle.config.js ===
+import 'dotenv/config';
+
+export default {
+  dialect: 'postgresql',
+  schema: './db/schema.js',
+  out: './drizzle',
+  dbCredentials: {
+    url: process.env.DATABASE_URL,
+  },
+};
+
+=== File: package.json ===
+{
+  "name": "my-todos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.44.6",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.5"
+  }
+}
+
+
+
+=== File: drizzle/0000_sparkling_roulette.sql ===
+[Binary or unreadable file]
+
+
+=== File: db/index.js ===
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import * as schema from './schema.js';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+export const db = drizzle(pool, { schema });
+
+
+=== File: db/schema.js ===
+import { pgTable, serial, varchar, text, integer } from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  username: varchar('username', { length: 256 }).notNull().unique(),
+  password: varchar('password', { length: 256 }).notNull(),
+});
+
+export const todos = pgTable('todos', {
+  id: serial('id').primaryKey(),
+  note: text('note').notNull(),
+  userId: integer('user_id')
+    .references(() => users.id)
+    .notNull(),
+});
+
+
+=== File: db/seed.js ===
+import 'dotenv/config';
+import { db } from './index.js';
+import { santri } from './schema.js';
+
+async function main() {
+  await db.insert(santri).values([
+    { id: 1, nama: 'Ahmad Fauzi', kelas: 10 },
+    { id: 2, nama: 'Muhammad Rizky', kelas: 12 },
+    { id: 3, nama: 'Alwi Saputra', kelas: 11 },
+  ]);
+
+  console.log(' Data santri berhasil di-seed');
+}
+
+main();
+
+
+=== File: drizzle/meta/0000_snapshot.json ===
+{
+  "id": "b78fbe92-34f3-4c47-81b5-722c6d1b4eec",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.todos": {
+      "name": "todos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "todos_user_id_users_id_fk": {
+          "name": "todos_user_id_users_id_fk",
+          "tableFrom": "todos",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password": {
+          "name": "password",
+          "type": "varchar(256)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
+
+=== File: drizzle/meta/_journal.json ===
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1759705697161,
+      "tag": "0000_sparkling_roulette",
+      "breakpoints": true
+    }
+  ]
+}
